@@ -1,10 +1,12 @@
-name: Python CI                                                                                                                                                  
+name: Python CI/CD                                                                                                                                               
                                                                                                                                                                    
 on:                                                                                                                                                              
   push:                                                                                                                                                          
-    branches: [ main ]                                                                                                                                           
+    branches: [ main ]        # 推送到 main 分支时触发（跑测试）                                                                                                 
+    tags: [ 'v*' ]            # 推送以 v 开头的标签时也触发（如 v1.0、v1.1）                                                                                     
                                                                                                                                                                   
 jobs:                                                                                                                                                            
+  # ===== 任务一：测试（昨天的 CI）=====                                                                                                                         
   test:                                                                                                                                                          
     runs-on: ubuntu-latest                                                                                                                                       
     steps:                                                                                                                                                       
@@ -20,4 +22,28 @@ jobs:
         run: pip install -r requirements.txt                                                                                                                     
                                                                                                                                                                   
       - name: 运行测试                                                                                                                                           
-        run: pytest tests/ -v
+        run: pytest tests/ -v                                                                                                                                    
+                                                                                                                                                                  
+  # ===== 任务二：打包发布（今天的 CD）=====                                                                                                                     
+  release:                                                                                                                                                       
+    needs: test                              # 关键：必须 test 任务成功后才执行                                                                                  
+    if: startsWith(github.ref, 'refs/tags/') # 关键：只有在「打标签」时才执行                                                                                    
+    runs-on: ubuntu-latest                                                                                                                                       
+    permissions:                                                                                                                                                 
+      contents: write                        # 授权：允许这个任务创建 Release                                                                                    
+    steps:                                                                                                                                                       
+      - name: 拉取代码                                                                                                                                           
+        uses: actions/checkout@v4                                                                                                                                
+                                                                                                                                                                  
+      - name: 打包成压缩文件                                                                                                                                     
+        run: |                                                                                                                                                   
+          mkdir release                                                                                                                                          
+          cp -r src release/                  # 把 src 目录复制到 release 文件夹                                                                                 
+          cp requirements.txt release/        # 把依赖清单也放进去                                                                                               
+          cd release                                                                                                                                             
+          zip -r ../myapp.zip .               # 打包成 myapp.zip                                                                                                 
+                                                                                                                                                                  
+      - name: 创建 GitHub Release                                                                                                                                
+        uses: softprops/action-gh-release@v2  # 社区 action：负责创建 Release 并上传文件                                                                         
+        with:                                                                                                                                                    
+          files: myapp.zip                    # 要上传到 Release 的文件
